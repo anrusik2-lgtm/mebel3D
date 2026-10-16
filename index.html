@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Конфигуратор</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#eee;overflow:hidden;height:100vh;}
+#app{display:flex;height:100vh;}
+
+/* Левая панель */
+#leftPanel{width:320px;background:#16213e;padding:15px;overflow-y:auto;border-right:2px solid #0f3460;z-index:10;flex-shrink:0;}
+#leftPanel h2{font-size:16px;margin-bottom:10px;color:#e94560;}
+.mode-switch{display:flex;gap:5px;margin-bottom:12px;}
+.mode-btn{flex:1;padding:8px;border:1px solid #0f3460;background:#1a1a2e;color:#eee;border-radius:4px;cursor:pointer;font-size:13px;}
+.mode-btn.active{background:#e94560;border-color:#e94560;}
+.catalog-section{margin-bottom:15px;}
+.catalog-section h3{font-size:14px;margin-bottom:8px;color:#a8d8ea;}
+.model-item{padding:8px 10px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;margin-bottom:5px;cursor:pointer;font-size:13px;transition:all .2s;}
+.model-item:hover{background:#0f3460;border-color:#e94560;}
+.model-item.added{border-color:#4ecca3;color:#4ecca3;}
+.added-list{margin-top:10px;}
+.added-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#1a1a2e;border-radius:4px;margin-bottom:4px;font-size:12px;}
+.added-item .remove-btn{color:#e94560;cursor:pointer;font-weight:bold;padding:0 6px;}
+.antressol-toggle{padding:8px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;cursor:pointer;font-size:13px;margin-top:8px;width:100%;text-align:left;}
+.antressol-toggle.active{background:#4ecca3;color:#1a1a2e;border-color:#4ecca3;}
+
+/* Сцена */
+#sceneContainer{flex:1;position:relative;overflow:hidden;}
+#canvas3d{width:100%;height:100%;display:block;}
+
+/* Верхняя панель сцены */
+#topBar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;flex-wrap:wrap;z-index:5;}
+.top-btn{padding:8px 14px;background:rgba(22,33,62,.9);border:1px solid #0f3460;color:#eee;border-radius:4px;cursor:pointer;font-size:13px;backdrop-filter:blur(5px);}
+.top-btn:hover{background:#0f3460;}
+.top-btn.active{background:#e94560;border-color:#e94560;}
+
+/* Правая панель */
+#rightPanel{width:280px;background:#16213e;padding:15px;overflow-y:auto;border-left:2px solid #0f3460;z-index:10;flex-shrink:0;}
+#rightPanel h3{font-size:14px;margin-bottom:10px;color:#e94560;}
+.tab-bar{display:flex;gap:3px;margin-bottom:10px;}
+.tab-btn{flex:1;padding:6px;background:#1a1a2e;border:1px solid #0f3460;color:#eee;border-radius:4px;cursor:pointer;font-size:11px;}
+.tab-btn.active{background:#e94560;border-color:#e94560;}
+.color-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:10px;}
+.color-swatch{width:100%;aspect-ratio:1;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:all .2s;}
+.color-swatch:hover{transform:scale(1.1);}
+.color-swatch.selected{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.5);}
+.color-swatch .name{font-size:9px;text-align:center;margin-top:2px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.texture-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px;}
+.texture-swatch{width:100%;aspect-ratio:1;border-radius:4px;cursor:pointer;border:2px solid transparent;background-size:cover;background-position:center;}
+.texture-swatch.selected{border-color:#fff;}
+.checkbox-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;}
+.checkbox-row input{width:16px;height:16px;}
+.action-btn{width:100%;padding:10px;background:#e94560;border:none;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;margin-top:8px;}
+.action-btn:hover{background:#c73e54;}
+.action-btn.secondary{background:#0f3460;}
+.action-btn.secondary:hover{background:#1a4a8a;}
+
+/* View Cube */
+#viewCube{position:absolute;bottom:20px;right:20px;width:120px;height:120px;z-index:5;pointer-events:none;}
+#viewCubeInner{width:100%;height:100%;position:relative;pointer-events:auto;}
+.cube-face{position:absolute;width:60px;height:60px;left:30px;top:30px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;color:#fff;cursor:pointer;border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(2px);transition:all .2s;text-shadow:1px 1px 2px rgba(0,0,0,.8);}
+.cube-face:hover{background:rgba(233,69,96,.8)!important;}
+.cube-face.front{background:rgba(78,204,163,.6);transform:translateZ(30px);}
+.cube-face.back{background:rgba(78,204,163,.6);transform:rotateY(180deg) translateZ(30px);}
+.cube-face.right{background:rgba(168,216,234,.6);transform:rotateY(90deg) translateZ(30px);}
+.cube-face.left{background:rgba(168,216,234,.6);transform:rotateY(-90deg) translateZ(30px);}
+.cube-face.top{background:rgba(233,69,96,.6);transform:rotateX(90deg) translateZ(30px);}
+.cube-face.bottom{background:rgba(233,69,96,.6);transform:rotateX(-90deg) translateZ(30px);}
+.cube-arrow{position:absolute;width:24px;height:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:#4ecca3;transition:all .2s;}
+.cube-arrow:hover{color:#e94560;transform:scale(1.3);}
+.cube-arrow.top{top:-5px;left:50%;transform:translateX(-50%);}
+.cube-arrow.bottom{bottom:-5px;left:50%;transform:translateX(-50%);}
+.cube-arrow.left{left:-5px;top:50%;transform:translateY(-50%);}
+.cube-arrow.right{right:-5px;top:50%;transform:translateY(-50%);}
+.cube-arrow.front{bottom:5px;left:50%;transform:translateX(-50%);}
+.cube-arrow.back{top:5px;left:50%;transform:translateX(-50%);}
+
+/* Модальные окна */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:20px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;}
+.modal h3{color:#e94560;margin-bottom:15px;}
+.modal p{margin-bottom:10px;font-size:13px;line-height:1.5;}
+.modal-close{float:right;cursor:pointer;font-size:20px;color:#e94560;}
+.setting-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:13px;}
+.setting-row label{min-width:120px;}
+.setting-row input[type="color"]{width:50px;height:30px;border:none;cursor:pointer;}
+.setting-row input[type="range"]{flex:1;}
+.setting-row select{flex:1;padding:5px;background:#1a1a2e;color:#eee;border:1px solid #0f3460;border-radius:4px;}
+
+/* Загрузка */
+#loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:18px;color:#e94560;z-index:50;display:none;}
+#loading.show{display:block;}
+
+/* Подсказка */
+#hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(22,33,62,.9);padding:8px 16px;border-radius:4px;font-size:12px;z-index:5;display:none;}
+#hint.show{display:block;}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Левая панель -->
+  <div id="leftPanel">
+    <h2>🧲 3D Конфигуратор</h2>
+    <div class="mode-switch">
+      <button class="mode-btn active" data-mode="normal">Обычный</button>
+      <button class="mode-btn" data-mode="extended">Расширенный</button>
+    </div>
+    <div class="catalog-section">
+      <h3>📂 Каталог моделей</h3>
+      <div id="modelCatalog"></div>
+    </div>
+    <button class="antressol-toggle" id="antressolBtn">🧲 Режим: Антресоль (выкл)</button>
+    <div class="added-list">
+      <h3>Добавлено в сцену: <span id="addedCount">0</span></h3>
+      <div id="addedList"></div>
+    </div>
+  </div>
+
+  <!-- Сцена -->
+  <div id="sceneContainer">
+    <canvas id="canvas3d"></canvas>
+    <div id="loading">⏳ Загрузка...</div>
+    <div id="hint"></div>
+    
+    <div id="topBar">
+      <button class="top-btn" id="btnRulers">🗑️ Удалить линейки</button>
+      <button class="top-btn" id="btnClear">🗑️ Очистить сцену</button>
+      <button class="top-btn" id="btnTopView">🔄 Вид сверху</button>
+      <button class="top-btn" id="btnRuler">📏 Линейка (выкл)</button>
+      <button class="top-btn" id="btnSettings">⚙️</button>
+      <button class="top-btn" id="btnHelp">❓</button>
+    </div>
+
+    <!-- View Cube -->
+    <div id="viewCube">
+      <div id="viewCubeInner">
+        <div class="cube-face front" data-view="front">ПЕР</div>
+        <div class="cube-face back" data-view="back">ЗАД</div>
+        <div class="cube-face right" data-view="right">ПРАВ</div>
+        <div class="cube-face left" data-view="left">ЛЕВ</div>
+        <div class="cube-face top" data-view="top">ВЕРХ</div>
+        <div class="cube-face bottom" data-view="bottom">НИЗ</div>
+        <div class="cube-arrow top" data-view="top">▲</div>
+        <div class="cube-arrow bottom" data-view="bottom">▼</div>
+        <div class="cube-arrow left" data-view="left">◀</div>
+        <div class="cube-arrow right" data-view="right">▶</div>
+        <div class="cube-arrow front" data-view="front"></div>
+        <div class="cube-arrow back" data-view="back">⬇</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Правая панель -->
+  <div id="rightPanel">
+    <h3>🎨 Покраска</h3>
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="standard">Стандартные</button>
+      <button class="tab-btn" data-tab="fantasy">Фантазийные</button>
+      <button class="tab-btn" data-tab="paint">Покраска</button>
+    </div>
+    <div id="colorContainer"></div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="replaceAll">
+      <label for="replaceAll">Заменить весь цвет</label>
+    </div>
+    <button class="action-btn secondary" id="btnResetMaterial">Вернуть материал</button>
+    <button class="action-btn" id="btnDownload">📷 Скачать изображение</button>
+  </div>
+</div>
+
+<!-- Модальное окно помощи -->
+<div class="modal-overlay" id="helpModal">
+  <div class="modal">
+    <span class="modal-close" onclick="document.getElementById('helpModal').classList.remove('show')">×</span>
+    <h3>📖 Как пользоваться конфигуратором</h3>
+    <p><b>1. Режимы работы.</b> Вверху слева переключатель «Обычный / Расширенный». В Обычном режиме — одно изделие и покраска. В Расширенном — несколько изделий, перемещение, антресоли, линейка.</p>
+    <p><b>2. Добавление изделий.</b> Кликните по модели в каталоге. В обычном режиме — в центре. В расширенном — с поворотом 180°.</p>
+    <p><b>3. Перемещение (Расширенный).</b> Зажмите ЛКМ на изделии и тащите. Изделия примагничиваются на расстоянии до 100 мм.</p>
+    <p><b>4. Поворот.</b> Кликните на изделие (подсветится красным), затем ПКМ или клавиша R — поворот на 90°.</p>
+    <p><b>5. Антресоли.</b> Включите кнопку «🧲 Режим: Антресоль», затем кликните по модели. Антресоль встанет сверху на шкаф.</p>
+    <p><b>6. Выделение деталей.</b> Клик ЛКМ по детали — подсветка. Ctrl+клик — множественное выделение.</p>
+    <p><b>7. Покраска.</b> Выберите цвет/текстуру на правой панели. Детали _NON не окрашиваются. Детали _FAN — только из вкладки «Покраска».</p>
+    <p><b>8. Линейка.</b> Нажмите «📏 Линейка», кликните первую точку, затем вторую. Третий клик — фиксация.</p>
+    <p><b>9. Вид камеры.</b> «🔄 Вид сверху» переключает между видом сверху и аксонометрией.</p>
+    <p><b>10. Кубик навигации.</b> В правом нижнем углу — кубик со стрелочками. Клик по грани или стрелке поворачивает камеру.</p>
+  </div>
+</div>
+
+<!-- Модальное окно настроек -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <span class="modal-close" onclick="document.getElementById('settingsModal').classList.remove('show')">×</span>
+    <h3>⚙️ Настройки комнаты</h3>
+    <div class="setting-row"><label>Цвет пола:</label><input type="color" id="floorColor" value="#8B7355"></div>
+    <div class="setting-row"><label>Цвет стен:</label><input type="color" id="wallColor" value="#D4C5B0"></div>
+    <div class="setting-row"><label>Текстура стен:</label>
+      <select id="wallTexture"><option value="">Сплошной цвет</option><option value="brick">Кирпич</option><option value="wood">Дерево</option><option value="concrete">Бетон</option></select>
+    </div>
+    <div class="setting-row"><label>Яркость света:</label><input type="range" id="lightBrightness" min="160" max="500" value="250"><span id="lightVal">250%</span></div>
+    <div class="setting-row"><label>Размер текста линейки:</label><input type="range" id="rulerFontSize" min="80" max="200" value="120"><span id="rulerVal">120px</span></div>
+    <button class="action-btn" onclick="applySettings()">Применить</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================================
+// КОНФИГУРАТОР 3D — РАБОТА С HTML-ЭКСПОРТОМ БАЗИС-МЕБЕЛЬЩИК
+// ============================================================================
+
+const CONFIG = {
+  MAGNET_DISTANCE: 100, // мм
+  DEFAULT_ROOM: { width: 4000, depth: 3000, height: 2700 },
+  MODELS_DIR: 'models/',
+  COLORS: {
+    standard: [
+      { name: 'Белый', hex: '#FFFFFF' },
+      { name: 'Дуб сонома', hex: '#C4A882' },
+      { name: 'Дуб молочный', hex: '#E8DCC8' },
+      { name: 'Орех', hex: '#8B6F47' },
+      { name: 'Венге', hex: '#4A3728' },
+      { name: 'Бук', hex: '#D4A574' },
+      { name: 'Ясень', hex: '#B8956A' },
+      { name: 'Серый', hex: '#808080' }
+    ],
+    fantasy: [
+      { name: 'Красный', hex: '#CC0000' },
+      { name: 'Синий', hex: '#0066CC' },
+      { name: 'Зелёный', hex: '#009933' },
+      { name: 'Жёлтый', hex: '#FFCC00' },
+      { name: 'Оранжевый', hex: '#FF6600' },
+      { name: 'Фиолетовый', hex: '#9933CC' },
+      { name: 'Розовый', hex: '#FF6699' },
+      { name: 'Бирюзовый', hex: '#00CCCC' }
+    ],
+    paint: [
+      { name: 'Белый RAL', hex: '#F5F5F0' },
+      { name: 'Чёрный мат', hex: '#1A1A1A' },
+      { name: 'Серый графит', hex: '#4A4A4A' },
+      { name: 'Синий navy', hex: '#1B2A4A' },
+      { name: 'Зелёный forest', hex: '#2D4A2D' },
+      { name: 'Красный burgundy', hex: '#6B1D2A' }
+    ]
+  }
+};
+
+// ============================================================================
+// ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// ============================================================================
+let scene, camera, renderer, controls;
+let raycaster, mouse;
+let models = []; // загруженные модели из каталога
+let addedItems = []; // добавленные в сцену
+let selectedItems = []; // выделенные
+let selectedMeshes = []; // выделенные меши (детали)
+let mode = 'normal'; // normal / extended
+let antressolMode = false;
+let rulerMode = false;
+let rulerPoints = [];
+let rulerLines = [];
+let topView = false;
+let originalMaterials = new Map(); // для сброса цвета
+let modelDataCache = {}; // кэш распарсенных HTML
+
+// Three.js объекты сцены
+let roomGroup, floorMesh, wallMeshes = [];
+let ambientLight, dirLight;
+
+// ============================================================================
+// ИНИЦИАЛИЗАЦИЯ
+// ============================================================================
+function init() {
+  const container = document.getElementById('sceneContainer');
+  const canvas = document.getElementById('canvas3d');
+  
+  // Сцена
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1a2e);
+  
+  // Камера
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 50000);
+  camera.position.set(2000, 2000, 2000);
+  camera.lookAt(0, 0, 0);
+  
+  // Рендерер
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  
+  // OrbitControls (упрощённая версия)
+  setupControls();
+  
+  // Raycaster
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+  
+  // Освещение
+  ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
+  dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(1000, 2000, 1000);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.camera.near = 100;
+  dirLight.shadow.camera.far = 10000;
+  dirLight.shadow.camera.left = -3000;
+  dirLight.shadow.camera.right = 3000;
+  dirLight.shadow.camera.top = 3000;
+  dirLight.shadow.camera.bottom = -3000;
+  scene.add(dirLight);
+  
+  // Комната
+  createRoom();
+  
+  // Загрузка каталога
+  loadCatalog();
+  
+  // События
+  setupEvents();
+  
+  // Анимация
+  animate();
+}
+
+// ============================================================================
+// УПРАВЛЕНИЕ КАМЕРОЙ (упрощённые OrbitControls)
+// ============================================================================
+let isDragging = false, isPanning = false;
+let prevMouse = { x: 0, y: 0 };
+let spherical = { radius: 3000, theta: Math.PI / 4, phi: Math.PI / 4 };
+let target = new THREE.Vector3(0, 500, 0);
+
+function setupControls() {
+  const canvas = document.getElementById('canvas3d');
+  
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0 && !rulerMode && mode === 'extended') {
+      // Проверка клика по объекту для перемещения
+      updateMouse(e);
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(getAllMeshes(), false);
+      if (intersects.length > 0) {
+        const item = findItemByMesh(intersects[0].object);
+        if (item) {
+          isDragging = true;
+          item._dragOffset = intersects[0].point.clone().sub(item.group.position);
+          return;
+        }
+      }
+    }
+    if (e.button === 0) { isDragging = true; }
+    if (e.button === 2) { isPanning = true; }
+    prevMouse = { x: e.clientX, y: e.clientY };
+  });
+  
+  canvas.addEventListener('mousemove', (e) => {
+    const dx = e.clientX - prevMouse.x;
+    const dy = e.clientY - prevMouse.y;
+    
+    if (isDragging && mode === 'extended') {
+      // Перемещение выделенного объекта
+      if (selectedItems.length > 0 && selectedItems[0]._dragOffset) {
+        updateMouse(e);
+        raycaster.setFromCamera(mouse, camera);
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const intersect = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersect);
+        if (intersect) {
+          const newPos = intersect.sub(selectedItems[0]._dragOffset);
+          // Магнетизм
+          applyMagnetism(selectedItems[0], newPos);
+        }
+      } else if (!rulerMode) {
+        // Вращение камеры
+        spherical.theta -= dx * 0.005;
+        spherical.phi -= dy * 0.005;
+        spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+        updateCamera();
+      }
+    } else if (isDragging && !rulerMode) {
+      spherical.theta -= dx * 0.005;
+      spherical.phi -= dy * 0.005;
+      spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+      updateCamera();
+    } else if (isPanning) {
+      const right = new THREE.Vector3();
+      const up = new THREE.Vector3(0, 1, 0);
+      camera.getWorldDirection(right);
+      right.cross(up).normalize();
+      const panSpeed = spherical.radius * 0.001;
+      target.add(right.multiplyScalar(-dx * panSpeed));
+      target.y += dy * panSpeed;
+      updateCamera();
+    } else if (rulerMode && rulerPoints.length === 1) {
+      showRulerPreview(e);
+    }
+    
+    prevMouse = { x: e.clientX, y: e.clientY };
+  });
+  
+  canvas.addEventListener('mouseup', (e) => {
+    if (isDragging && mode === 'extended' && selectedItems.length > 0) {
+      selectedItems[0]._dragOffset = null;
+    }
+    isDragging = false;
+    isPanning = false;
+    
+    if (rulerMode) {
+      handleRulerClick(e);
+    } else if (e.button === 0 && !wasDragged()) {
+      handleClick(e);
+    }
+  });
+  
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (selectedItems.length > 0) {
+      rotateSelected();
+    }
+  });
+  
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    spherical.radius *= (1 + e.deltaY * 0.001);
+    spherical.radius = Math.max(100, Math.min(20000, spherical.radius));
+    updateCamera();
+  });
+  
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
+      if (selectedItems.length > 0) rotateSelected();
+    }
+    if (e.key === 'Escape') {
+      rulerMode = false;
+      rulerPoints = [];
+      document.getElementById('btnRuler').textContent = '📏 Линейка (выкл)';
+      document.getElementById('btnRuler').classList.remove('active');
+      clearSelection();
+    }
+  });
+  
+  window.addEventListener('resize', () => {
+    const container = document.getElementById('sceneContainer');
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+  });
+  
+  updateCamera();
+}
+
+let dragStartPos = null;
+function wasDragged() {
+  return false; // упрощение
+}
+
+function updateCamera() {
+  camera.position.x = target.x + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  camera.position.y = target.y + spherical.radius * Math.cos(spherical.phi);
+  camera.position.z = target.z + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+  camera.lookAt(target);
+  updateViewCube();
+}
+
+// ============================================================================
+// КОМНАТА
+// ============================================================================
+function createRoom() {
+  roomGroup = new THREE.Group();
+  scene.add(roomGroup);
+  
+  const w = CONFIG.DEFAULT_ROOM.width;
+  const d = CONFIG.DEFAULT_ROOM.depth;
+  const h = CONFIG.DEFAULT_ROOM.height;
+  
+  // Пол
+  const floorGeo = new THREE.PlaneGeometry(w, d);
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.8 });
+  floorMesh = new THREE.Mesh(floorGeo, floorMat);
+  floorMesh.rotation.x = -Math.PI / 2;
+  floorMesh.position.set(0, 0, 0);
+  floorMesh.receiveShadow = true;
+  floorMesh.name = 'floor';
+  roomGroup.add(floorMesh);
+  
+  // Стены
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xD4C5B0, roughness: 0.9, side: THREE.DoubleSide });
+  
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat);
+  backWall.position.set(0, h / 2, -d / 2);
+  backWall.receiveShadow = true;
+  backWall.name = 'wall_back';
+  roomGroup.add(backWall);
+  wallMeshes.push(backWall);
+  
+  const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMat);
+  leftWall.rotation.y = Math.PI / 2;
+  leftWall.position.set(-w / 2, h / 2, 0);
+  leftWall.receiveShadow = true;
+  leftWall.name = 'wall_left';
+  roomGroup.add(leftWall);
+  wallMeshes.push(leftWall);
+  
+  const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(d, h), wallMat);
+  rightWall.rotation.y = -Math.PI / 2;
+  rightWall.position.set(w / 2, h / 2, 0);
+  rightWall.receiveShadow = true;
+  rightWall.name = 'wall_right';
+  roomGroup.add(rightWall);
+  wallMeshes.push(rightWall);
+  
+  // Сетка на полу
+  const gridHelper = new THREE.GridHelper(Math.max(w, d), Math.max(w, d) / 100, 0x444444, 0x333333);
+  gridHelper.position.y = 1;
+  roomGroup.add(gridHelper);
+}
+
+// ============================================================================
+// ЗАГРУЗКА КАТАЛОГА
+// ============================================================================
+async function loadCatalog() {
+  const catalog = document.getElementById('modelCatalog');
+  catalog.innerHTML = '<div style="color:#888;font-size:12px;">Загрузка...</div>';
+  
+  // Список моделей (можно расширять)
+  const modelFiles = [
+    'Горка ''Забава''.html'
+  ];
+  
+  models = [];
+  catalog.innerHTML = '';
+  
+  for (const file of modelFiles) {
+    const item = document.createElement('div');
+    item.className = 'model-item';
+    item.textContent = file.replace('.html', '');
+    item.dataset.file = file;
+    item.addEventListener('click', () => addModel(file));
+    catalog.appendChild(item);
+    
+    // Предзагрузка
+    try {
+      const data = await loadModelData(CONFIG.MODELS_DIR + file);
+      models.push({ file, name: file.replace('.html', ''), data });
+    } catch (e) {
+      console.warn('Не удалось загрузить:', file, e);
+    }
+  }
+  
+  if (models.length === 0) {
+    catalog.innerHTML = '<div style="color:#e94560;font-size:12px;">Папка models/ пуста или недоступна.<br>Положите HTML-файлы из Базиса в папку models/.</div>';
+  }
+}
+
+// ============================================================================
+// ПАРСИНГ HTML-ЭКСПОРТА БАЗИСА
+// ============================================================================
+async function loadModelData(url) {
+  if (modelDataCache[url]) return modelDataCache[url];
+  
+  const response = await fetch(url);
+  const html = await response.text();
+  
+  // Извлекаем JSON между маркерами
+  let jsonStr = '';
+  const marker = '/* =MODEL_DATA_PLACEHOLDER= */';
+  const idx = html.indexOf(marker);
+  if (idx >= 0) {
+    const start = idx + marker.length;
+    // Ищем конец JSON (последняя } перед </script>)
+    const endScript = html.indexOf('</script>', start);
+    const endMarker = html.indexOf('/* =END_MODEL_DATA= */', start);
+    const end = endMarker > 0 ? endMarker : (endScript > 0 ? endScript : html.length);
+    jsonStr = html.substring(start, end).trim();
+    // Убираем возможную запятую в конце
+    if (jsonStr.endsWith(',')) jsonStr = jsonStr.slice(0, -1);
+  } else {
+    // Альтернативный поиск: ищем большой JSON объект
+    const match = html.match(/\{[\s\S]*"meta"[\s\S]*"materials"[\s\S]*"objects"[\s\S]*\}/);
+    if (match) jsonStr = match[0];
+  }
+  
+  if (!jsonStr) throw new Error('JSON не найден в HTML');
+  
+  const data = JSON.parse(jsonStr);
+  modelDataCache[url] = data;
+  return data;
+}
+
+// Распаковка packed mesh (base64)
+function unpackMesh(packed) {
+  const binary = atob(packed);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  
+  const dv = new DataView(bytes.buffer);
+  let off = 0;
+  
+  const posCount = dv.getUint32(off, true); off += 4;
+  const positions = new Float32Array(bytes.buffer, off, posCount); off += posCount * 4;
+  
+  const norCount = dv.getUint32(off, true); off += 4;
+  const normals = norCount > 0 ? new Float32Array(bytes.buffer, off, norCount) : null;
+  if (normals) off += norCount * 4;
+  
+  const uvCount = dv.getUint32(off, true); off += 4;
+  const uvMin = dv.getFloat32(off, true); off += 4;
+  const uvRange = dv.getFloat32(off, true); off += 4;
+  
+  let uvs = null;
+  if (uvCount > 0) {
+    // Проверяем, Uint16 или Float32
+    const remaining = bytes.length - off;
+    if (remaining === uvCount * 2) {
+      // Uint16 квантованные
+      const uv16 = new Uint16Array(bytes.buffer, off, uvCount);
+      uvs = new Float32Array(uvCount);
+      for (let i = 0; i < uvCount; i++) {
+        uvs[i] = uvMin + (uv16[i] / 65535) * uvRange;
+      }
+    } else {
+      uvs = new Float32Array(bytes.buffer, off, uvCount);
+    }
+  }
+  
+  return { positions: Array.from(positions), normals: normals ? Array.from(normals) : [], uvs: uvs ? Array.from(uvs) : [] };
+}
+
+// ============================================================================
+// ПОСТРОЕНИЕ 3D ОБЪЕКТА ИЗ ДАННЫХ БАЗИСА
+// ============================================================================
+function buildModelFromData(data, options = {}) {
+  const group = new THREE.Group();
+  group.userData = { modelData: data, isFurniture: true };
+  
+  const materials = buildMaterials(data.materials || []);
+  const objects = data.objects || [];
+  
+  let bbox = { min: [1e15, 1e15, 1e15], max: [-1e15, -1e15, -1e15] };
+  
+  for (const obj of objects) {
+    if (!obj.visible && obj.visible !== undefined) continue;
+    
+    const objGroup = new THREE.Group();
+    objGroup.userData = {
+      uid: obj.uid,
+      name: obj.name || '',
+      type: obj.type || '',
+      originalPosition: null,
+      meshes: [],
+      drawObjects: [],
+      panelData: obj.panelData || null,
+      isPanel: !!obj.isPanel,
+      colorHex: obj.colorHex || ''
+    };
+    
+    // Meshes
+    if (obj.meshes && obj.meshes.length) {
+      for (const meshData of obj.meshes) {
+        let positions, normals, uvs;
+        
+        if (meshData.packed) {
+          const unpacked = unpackMesh(meshData.packed);
+          positions = unpacked.positions;
+          normals = unpacked.normals;
+          uvs = unpacked.uvs;
+        } else {
+          positions = meshData.positions || [];
+          normals = meshData.normals || [];
+          uvs = meshData.uvs || [];
+        }
+        
+        if (positions.length < 9) continue;
+        
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        if (normals.length === positions.length) {
+          geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+        } else {
+          geo.computeVertexNormals();
+        }
+        if (uvs.length >= 6) {
+          geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        }
+        
+        const matId = meshData.materialId || 0;
+        const mat = materials[matId] || materials[0] || new THREE.MeshStandardMaterial({ color: 0xcccccc });
+        const mesh = new THREE.Mesh(geo, mat.clone());
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData = {
+          objUid: obj.uid,
+          objName: obj.name,
+          materialId: matId,
+          originalColor: mat.color.getHex(),
+          originalMaterial: mat
+        };
+        
+        objGroup.add(mesh);
+        objGroup.userData.meshes.push(mesh);
+        
+        // Обновляем bbox
+        for (let i = 0; i < positions.length; i += 3) {
+          const x = positions[i], y = positions[i+1], z = positions[i+2];
+          if (x < bbox.min[0]) bbox.min[0] = x;
+          if (y < bbox.min[1]) bbox.min[1] = y;
+          if (z < bbox.min[2]) bbox.min[2] = z;
+          if (x > bbox.max[0]) bbox.max[0] = x;
+          if (y > bbox.max[1]) bbox.max[1] = y;
+          if (z > bbox.max[2]) bbox.max[2] = z;
+        }
+      }
+    }
+    
+    // Draw data (линии, контуры, размеры, габаритные рамки)
+    if (obj.drawData) {
+      const drawObj = buildDrawData(obj.drawData);
+      if (drawObj) {
+        objGroup.add(drawObj);
+        objGroup.userData.drawObjects.push(drawObj);
+      }
+    }
+    
+    if (objGroup.children.length > 0) {
+      group.add(objGroup);
+    }
+  }
+  
+  // Центрируем модель
+  const cx = (bbox.min[0] + bbox.max[0]) / 2;
+  const cy = (bbox.min[1] + bbox.max[1]) / 2;
+  const cz = (bbox.min[2] + bbox.max[2]) / 2;
+  group.position.set(-cx, -bbox.min[1], -cz);
+  
+  // Сохраняем размеры
+  group.userData.size = {
+    x: bbox.max[0] - bbox.min[0],
+    y: bbox.max[1] - bbox.min[1],
+    z: bbox.max[2] - bbox.min[2]
+  };
+  group.userData.bbox = bbox;
+  
+  return group;
+}
+
+function buildMaterials(matList) {
+  const result = [];
+  for (const m of matList) {
+    let mat;
+    if (m.useColor || !m.hasTexture) {
+      mat = new THREE.MeshStandardMaterial({
+        color: parseInt(m.colorHex || 'cccccc', 16),
+        roughness: 0.7,
+        metalness: 0.1
+      });
+    } else if (m.textureDataUrl) {
+      const loader = new THREE.TextureLoader();
+      const tex = loader.load(m.textureDataUrl);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      mat = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.7,
+        metalness: 0.1
+      });
+    } else {
+      mat = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+    }
+    mat.userData = { original: m };
+    result.push(mat);
+  }
+  if (result.length === 0) {
+    result.push(new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+  }
+  return result;
+}
+
+function buildDrawData(dd) {
+  const group = new THREE.Group();
+  
+  if (dd.kind === 'line' || dd.kind === 'contour') {
+    const pts = [];
+    const segs = dd.segments || [];
+    for (let i = 0; i < segs.length; i += 6) {
+      pts.push(new THREE.Vector3(segs[i], segs[i+1], segs[i+2]));
+      pts.push(new THREE.Vector3(segs[i+3], segs[i+4], segs[i+5]));
+    }
+    if (pts.length >= 2) {
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: parseInt(dd.color || 'ffffff', 16) });
+      const line = new THREE.LineSegments(geo, mat);
+      group.add(line);
+    }
+  } else if (dd.kind === 'size') {
+    // Размерная линия
+    const pts = [
+      new THREE.Vector3(dd.p1[0], dd.p1[1], dd.p1[2]),
+      new THREE.Vector3(dd.p2[0], dd.p2[1], dd.p2[2]),
+      new THREE.Vector3(dd.d1[0], dd.d1[1], dd.d1[2]),
+      new THREE.Vector3(dd.d2[0], dd.d2[1], dd.d2[2])
+    ];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: parseInt(dd.color || '00ff00', 16) });
+    const line = new THREE.LineSegments(geo, mat);
+    group.add(line);
+    
+    // Текст размера
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = dd.color || '#00ff00';
+    ctx.font = 'bold 32px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.round(dd.val) + ' мм', 128, 40);
+    const tex = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.position.set(dd.textPos[0], dd.textPos[1], dd.textPos[2]);
+    sprite.scale.set(200, 50, 1);
+    group.add(sprite);
+  } else if (dd.kind === 'modelLimits') {
+    // Габаритная рамка OBB
+    if (dd.corners && dd.corners.length === 8) {
+      const pts = [];
+      const c = dd.corners;
+      const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+      for (const [a, b] of edges) {
+        pts.push(new THREE.Vector3(c[a][0], c[a][1], c[a][2]));
+        pts.push(new THREE.Vector3(c[b][0], c[b][1], c[b][2]));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ 
+        color: parseInt(dd.color || '00aaff', 16),
+        linewidth: dd.lineWidth || 1
+      });
+      const line = new THREE.LineSegments(geo, mat);
+      group.add(line);
+    }
+  }
+  
+  return group.children.length > 0 ? group : null;
+}
+
+// ============================================================================
+// ДОБАВЛЕНИЕ МОДЕЛИ В СЦЕНУ
+// ============================================================================
+async function addModel(file) {
+  const loading = document.getElementById('loading');
+  loading.classList.add('show');
+  
+  try {
+    let data;
+    const existing = models.find(m => m.file === file);
+    if (existing) {
+      data = existing.data;
+    } else {
+      data = await loadModelData(CONFIG.MODELS_DIR + file);
+      models.push({ file, name: file.replace('.html', ''), data });
+    }
+    
+    const group = buildModelFromData(data);
+    
+    if (mode === 'extended') {
+      group.rotation.y = Math.PI; // лицом к пользователю
+    }
+    
+    if (antressolMode && addedItems.length > 0) {
+      // Ставим сверху на последний добавленный шкаф
+      const lastItem = addedItems[addedItems.length - 1];
+      const lastSize = lastItem.group.userData.size || { y: 1000 };
+      group.position.y = lastSize.y;
+      group.userData.isAntressol = true;
+      group.userData.parentItem = lastItem;
+    }
+    
+    scene.add(group);
+    
+    const item = {
+      id: Date.now() + Math.random(),
+      file,
+      name: file.replace('.html', ''),
+      group,
+      data
+    };
+    addedItems.push(item);
+    
+    updateAddedList();
+    highlightCatalogItem(file);
+    
+    // Выделяем добавленное
+    clearSelection();
+    selectItem(item);
+    
+  } catch (e) {
+    console.error('Ошибка загрузки:', e);
+    alert('Ошибка загрузки модели: ' + e.message);
+  }
+  
+  loading.classList.remove('show');
+}
+
+// ============================================================================
+// ВЫДЕЛЕНИЕ И УПРАВЛЕНИЕ
+// ============================================================================
+function updateMouse(e) {
+  const container = document.getElementById('sceneContainer');
+  const rect = container.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function getAllMeshes() {
+  const meshes = [];
+  for (const item of addedItems) {
+    item.group.traverse((child) => {
+      if (child.isMesh) meshes.push(child);
+    });
+  }
+  return meshes;
+}
+
+function findItemByMesh(mesh) {
+  for (const item of addedItems) {
+    let found = false;
+    item.group.traverse((child) => {
+      if (child === mesh) found = true;
+    });
+    if (found) return item;
+  }
+  return null;
+}
+
+function handleClick(e) {
+  if (mode === 'normal' && addedItems.length === 0) return;
+  
+  updateMouse(e);
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(getAllMeshes(), false);
+  
+  if (intersects.length > 0) {
+    const mesh = intersects[0].object;
+    const item = findItemByMesh(mesh);
+    
+    if (item) {
+      if (e.ctrlKey || e.metaKey) {
+        // Множественное выделение
+        if (selectedItems.includes(item)) {
+          selectedItems = selectedItems.filter(i => i !== item);
+          unhighlightItem(item);
+        } else {
+          selectedItems.push(item);
+          highlightItem(item, mesh);
+        }
+      } else {
+        clearSelection();
+        selectItem(item, mesh);
+      }
+    }
+  } else {
+    if (!e.ctrlKey && !e.metaKey) {
+      clearSelection();
+    }
+  }
+}
+
+function selectItem(item, specificMesh) {
+  selectedItems = [item];
+  highlightItem(item, specificMesh);
+}
+
+function highlightItem(item, specificMesh) {
+  item.group.traverse((child) => {
+    if (child.isMesh) {
+      if (!originalMaterials.has(child.uuid)) {
+        originalMaterials.set(child.uuid, child.material.clone());
+      }
+      if (specificMesh && child !== specificMesh) {
+        child.material.emissive = new THREE.Color(0x330000);
+      } else {
+        child.material.emissive = new THREE.Color(0x660000);
+      }
+    }
+  });
+}
+
+function unhighlightItem(item) {
+  item.group.traverse((child) => {
+    if (child.isMesh && originalMaterials.has(child.uuid)) {
+      child.material = originalMaterials.get(child.uuid).clone();
+      originalMaterials.delete(child.uuid);
+    }
+  });
+}
+
+function clearSelection() {
+  for (const item of selectedItems) {
+    unhighlightItem(item);
+  }
+  selectedItems = [];
+  selectedMeshes = [];
+}
+
+function rotateSelected() {
+  for (const item of selectedItems) {
+    item.group.rotation.y += Math.PI / 2;
+  }
+}
+
+// ============================================================================
+// МАГНЕТИЗМ (расширенный режим)
+// ============================================================================
+function applyMagnetism(item, newPos) {
+  const mag = CONFIG.MAGNET_DISTANCE;
+  let finalPos = newPos.clone();
+  
+  for (const other of addedItems) {
+    if (other === item) continue;
+    const otherPos = other.group.position;
+    const otherSize = other.group.userData.size || { x: 500, y: 1000, z: 500 };
+    const itemSize = item.group.userData.size || { x: 500, y: 1000, z: 500 };
+    
+    // Проверка по X
+    const dx = Math.abs(finalPos.x - otherPos.x);
+    const combinedX = (itemSize.x + otherSize.x) / 2;
+    if (Math.abs(dx - combinedX) < mag) {
+      finalPos.x = otherPos.x + Math.sign(finalPos.x - otherPos.x) * combinedX;
+    }
+    
+    // Проверка по Z
+    const dz = Math.abs(finalPos.z - otherPos.z);
+    const combinedZ = (itemSize.z + otherSize.z) / 2;
+    if (Math.abs(dz - combinedZ) < mag) {
+      finalPos.z = otherPos.z + Math.sign(finalPos.z - otherPos.z) * combinedZ;
+    }
+  }
+  
+  // Ограничение полом
+  if (finalPos.y < 0) finalPos.y = 0;
+  
+  item.group.position.copy(finalPos);
+  
+  // Двигаем антресоли вместе с родителем
+  for (const other of addedItems) {
+    if (other.group.userData.parentItem === item) {
+      other.group.position.x = item.group.position.x;
+      other.group.position.z = item.group.position.z;
+    }
+  }
+}
+
+// ============================================================================
+// ЛИНЕЙКА
+// ============================================================================
+function handleRulerClick(e) {
+  updateMouse(e);
+  raycaster.setFromCamera(mouse, camera);
+  
+  const allObjects = [floorMesh, ...getAllMeshes()];
+  const intersects = raycaster.intersectObjects(allObjects, false);
+  
+  if (intersects.length > 0) {
+    const point = intersects[0].point;
+    rulerPoints.push(point);
+    
+    if (rulerPoints.length === 2) {
+      createRuler(rulerPoints[0], rulerPoints[1]);
+      rulerPoints = [];
+    }
+  }
+}
+
+function showRulerPreview(e) {
+  // Упрощённо: просто показываем линию
+}
+
+function createRuler(p1, p2) {
+  const distance = p1.distanceTo(p2);
+  const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+  
+  const pts = [p1, p2];
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 2 });
+  const line = new THREE.Line(geo, mat);
+  scene.add(line);
+  rulerLines.push(line);
+  
+  // Текст
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#00ff00';
+  ctx.font = 'bold 32px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(Math.round(distance) + ' мм', 128, 40);
+  const tex = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.position.copy(mid);
+  sprite.position.y += 50;
+  sprite.scale.set(200, 50, 1);
+  scene.add(sprite);
+  rulerLines.push(sprite);
+}
+
+// ============================================================================
+// ПОКРАСКА
+// ============================================================================
+function applyColor(hex) {
+  if (selectedItems.length === 0) {
+    alert('Сначала выделите деталь кликом мыши');
+    return;
+  }
+  
+  const replaceAll = document.getElementById('replaceAll').checked;
+  const color = new THREE.Color(hex);
+  
+  for (const item of selectedItems) {
+    item.group.traverse((child) => {
+      if (child.isMesh) {
+        const name = (child.userData.objName || '').toLowerCase();
+        
+        // _NON детали не красим
+        if (name.includes('_non')) return;
+        
+        // _FAN детали красим только из вкладки "Покраска"
+        const currentTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+        if (name.includes('_fan') && currentTab !== 'paint') return;
+        
+        if (replaceAll) {
+          child.material.color.copy(color);
+        } else {
+          child.material = child.material.clone();
+          child.material.color.copy(color);
+        }
+        
+        if (!originalMaterials.has(child.uuid)) {
+          originalMaterials.set(child.uuid, child.userData.originalMaterial || child.material.clone());
+        }
+      }
+    });
+  }
+  
+  if (replaceAll) {
+    document.getElementById('replaceAll').checked = false;
+  }
+}
+
+function resetMaterial() {
+  if (selectedItems.length === 0) {
+    // Сброс всех
+    for (const item of addedItems) {
+      item.group.traverse((child) => {
+        if (child.isMesh && child.userData.originalMaterial) {
+          child.material = child.userData.originalMaterial.clone();
+        }
+      });
+    }
+  } else {
+    for (const item of selectedItems) {
+      item.group.traverse((child) => {
+        if (child.isMesh && child.userData.originalMaterial) {
+          child.material = child.userData.originalMaterial.clone();
+        }
+      });
+    }
+  }
+}
+
+// ============================================================================
+// VIEW CUBE
+// ============================================================================
+function updateViewCube() {
+  const cube = document.getElementById('viewCubeInner');
+  if (!cube) return;
+  
+  // Вычисляем вращение кубика на основе камеры
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  
+  const yaw = Math.atan2(dir.x, dir.z);
+  const pitch = Math.asin(dir.y);
+  
+  cube.style.transform = `rotateY(${-yaw}rad) rotateX(${pitch}rad)`;
+}
+
+function setViewFromCube(view) {
+  const dist = spherical.radius;
+  
+  switch (view) {
+    case 'front':
+      target.set(0, 500, 0);
+      spherical.theta = 0;
+      spherical.phi = Math.PI / 2;
+      break;
+    case 'back':
+      target.set(0, 500, 0);
+      spherical.theta = Math.PI;
+      spherical.phi = Math.PI / 2;
+      break;
+    case 'right':
+      target.set(0, 500, 0);
+      spherical.theta = Math.PI / 2;
+      spherical.phi = Math.PI / 2;
+      break;
+    case 'left':
+      target.set(0, 500, 0);
+      spherical.theta = -Math.PI / 2;
+      spherical.phi = Math.PI / 2;
+      break;
+    case 'top':
+      target.set(0, 0, 0);
+      spherical.theta = 0;
+      spherical.phi = 0.1;
+      break;
+    case 'bottom':
+      target.set(0, 1000, 0);
+      spherical.theta = 0;
+      spherical.phi = Math.PI - 0.1;
+      break;
+  }
+  
+  updateCamera();
+}
+
+// ============================================================================
+// UI ОБНОВЛЕНИЯ
+// ============================================================================
+function updateAddedList() {
+  const list = document.getElementById('addedList');
+  const count = document.getElementById('addedCount');
+  list.innerHTML = '';
+  count.textContent = addedItems.length;
+  
+  for (const item of addedItems) {
+    const div = document.createElement('div');
+    div.className = 'added-item';
+    div.innerHTML = `<span>${item.name}</span><span class="remove-btn" data-id="${item.id}">✕</span>`;
+    div.querySelector('.remove-btn').addEventListener('click', () => removeItem(item.id));
+    list.appendChild(div);
+  }
+}
+
+function removeItem(id) {
+  const idx = addedItems.findIndex(i => i.id === id);
+  if (idx >= 0) {
+    const item = addedItems[idx];
+    scene.remove(item.group);
+    addedItems.splice(idx, 1);
+    
+    // Удаляем связанные антресоли
+    for (let i = addedItems.length - 1; i >= 0; i--) {
+      if (addedItems[i].group.userData.parentItem === item) {
+        scene.remove(addedItems[i].group);
+        addedItems.splice(i, 1);
+      }
+    }
+    
+    updateAddedList();
+    clearSelection();
+  }
+}
+
+function highlightCatalogItem(file) {
+  document.querySelectorAll('.model-item').forEach(el => {
+    if (el.dataset.file === file) el.classList.add('added');
+  });
+}
+
+function showHint(text) {
+  const hint = document.getElementById('hint');
+  hint.textContent = text;
+  hint.classList.add('show');
+  setTimeout(() => hint.classList.remove('show'), 3000);
+}
+
+// ============================================================================
+// НАСТРОЙКИ
+// ============================================================================
+function applySettings() {
+  const floorColor = document.getElementById('floorColor').value;
+  const wallColor = document.getElementById('wallColor').value;
+  const brightness = parseInt(document.getElementById('lightBrightness').value);
+  
+  if (floorMesh) {
+    floorMesh.material.color.set(floorColor);
+  }
+  for (const wall of wallMeshes) {
+    wall.material.color.set(wallColor);
+  }
+  
+  ambientLight.intensity = brightness / 250 * 0.6;
+  dirLight.intensity = brightness / 250 * 0.8;
+  
+  document.getElementById('settingsModal').classList.remove('show');
+  showHint('Настройки применены');
+}
+
+// ============================================================================
+// СОБЫТИЯ UI
+// ============================================================================
+function setupEvents() {
+  // Переключение режимов
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      showHint('Режим: ' + (mode === 'normal' ? 'Обычный' : 'Расширенный'));
+    });
+  });
+  
+  // Антресоль
+  document.getElementById('antressolBtn').addEventListener('click', function() {
+    antressolMode = !antressolMode;
+    this.classList.toggle('active', antressolMode);
+    this.textContent = antressolMode ? '🧲 Режим: Антресоль (вкл)' : '🧲 Режим: Антресоль (выкл)';
+  });
+  
+  // Кнопки верхней панели
+  document.getElementById('btnRulers').addEventListener('click', () => {
+    for (const line of rulerLines) scene.remove(line);
+    rulerLines = [];
+    showHint('Линейки удалены');
+  });
+  
+  document.getElementById('btnClear').addEventListener('click', () => {
+    for (const item of addedItems) scene.remove(item.group);
+    addedItems = [];
+    clearSelection();
+    updateAddedList();
+    document.querySelectorAll('.model-item').forEach(el => el.classList.remove('added'));
+    showHint('Сцена очищена');
+  });
+  
+  document.getElementById('btnTopView').addEventListener('click', function() {
+    topView = !topView;
+    this.classList.toggle('active', topView);
+    if (topView) {
+      target.set(0, 0, 0);
+      spherical.theta = 0;
+      spherical.phi = 0.1;
+      this.textContent = '🔄 Аксонометрия';
+    } else {
+      spherical.theta = Math.PI / 4;
+      spherical.phi = Math.PI / 4;
+      this.textContent = '🔄 Вид сверху';
+    }
+    updateCamera();
+  });
+  
+  document.getElementById('btnRuler').addEventListener('click', function() {
+    rulerMode = !rulerMode;
+    rulerPoints = [];
+    this.classList.toggle('active', rulerMode);
+    this.textContent = rulerMode ? '📏 Линейка (вкл)' : '📏 Линейка (выкл)';
+    showHint(rulerMode ? 'Кликните первую точку' : 'Линейка выключена');
+  });
+  
+  document.getElementById('btnSettings').addEventListener('click', () => {
+    document.getElementById('settingsModal').classList.add('show');
+  });
+  
+  document.getElementById('btnHelp').addEventListener('click', () => {
+    document.getElementById('helpModal').classList.add('show');
+  });
+  
+  // Вкладки цветов
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderColors(btn.dataset.tab);
+    });
+  });
+  
+  // Сброс материала
+  document.getElementById('btnResetMaterial').addEventListener('click', resetMaterial);
+  
+  // Скачать изображение
+  document.getElementById('btnDownload').addEventListener('click', () => {
+    // Убираем выделение перед снимком
+    const wasSelected = [...selectedItems];
+    clearSelection();
+    renderer.render(scene, camera);
+    const dataUrl = renderer.domElement.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'scene_' + Date.now() + '.png';
+    a.click();
+    // Восстанавливаем выделение
+    for (const item of wasSelected) highlightItem(item);
+    selectedItems = wasSelected;
+  });
+  
+  // View Cube клики
+  document.querySelectorAll('.cube-face, .cube-arrow').forEach(el => {
+    el.addEventListener('click', () => {
+      setViewFromCube(el.dataset.view);
+    });
+  });
+  
+  // Слайдеры настроек
+  document.getElementById('lightBrightness').addEventListener('input', function() {
+    document.getElementById('lightVal').textContent = this.value + '%';
+  });
+  document.getElementById('rulerFontSize').addEventListener('input', function() {
+    document.getElementById('rulerVal').textContent = this.value + 'px';
+  });
+  
+  // Начальная отрисовка цветов
+  renderColors('standard');
+}
+
+function renderColors(tab) {
+  const container = document.getElementById('colorContainer');
+  container.innerHTML = '';
+  const colors = CONFIG.COLORS[tab] || [];
+  
+  const grid = document.createElement('div');
+  grid.className = 'color-grid';
+  
+  for (const c of colors) {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+    swatch.style.background = c.hex;
+    swatch.innerHTML = `<div class="name">${c.name}</div>`;
+    swatch.addEventListener('click', () => {
+      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      swatch.classList.add('selected');
+      applyColor(c.hex);
+    });
+    grid.appendChild(swatch);
+  }
+  
+  container.appendChild(grid);
+}
+
+// ============================================================================
+// АНИМАЦИЯ
+// ============================================================================
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+// ============================================================================
+// ЗАПУСК
+// ============================================================================
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
